@@ -1,0 +1,64 @@
+name: Test renv Update
+
+on:
+  # Allows you to click the "Run workflow" button in the Actions tab
+  workflow_dispatch: 
+  # Keeps the schedule just in case you leave it running
+  schedule:
+    - cron: '0 4 * * 1'
+
+jobs:
+  update-renv:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          # Uses your Org secret if available, otherwise default token
+          token: ${{ secrets.AUTO_MERGE_TOKEN || github.token }}
+
+      - name: Setup R
+        uses: r-lib/actions/setup-r@v2
+        with:
+          r-version: 'release'
+          use-public-rspm: true 
+
+      - name: Install jaspModuleTools and run updateLockfile
+        run: |
+          # 1. Install remotes (needed to grab packages from GitHub)
+          Rscript -e 'install.packages("remotes")'
+          
+          # 2. Install your JASP tools directly from the master branch
+          Rscript -e 'remotes::install_github("jasp-stats/jaspModuleTools")'
+          
+          # 3. Call your custom update function on the current directory
+          Rscript -e 'jaspModuleTools::updateLockfile("./")'
+
+      - name: Create Pull Request
+        id: cpr
+        # PINNED TO SHA: This guarantees the code can never be maliciously altered
+        uses: peter-evans/create-pull-request@153407881ce5f542f288766ce3a5bf60cb15a930 # v6.0.5
+        with:
+          token: ${{ secrets.AUTO_MERGE_TOKEN || github.token }}
+          commit-message: "chore: update renv.lock dependencies via jaspModuleTools"
+          branch: "chore/update-renv"
+          delete-branch: true
+          title: "chore: update renv.lock dependencies"
+          body: |
+            Automated PR to update `renv.lock` using `jaspModuleTools::updateLockfile()`.
+            This PR is set to auto-merge once all required CI checks pass.
+
+      - name: Enable Pull Request Automerge
+        # Only check if a PR was actually created
+        if: steps.cpr.outputs.pull-request-operation == 'created'
+        env:
+          GH_TOKEN: ${{ secrets.AUTO_MERGE_TOKEN }}
+        run: |
+          # Check if the token is empty in bash (bypassing the YAML secrets restriction)
+          if [ -z "$GH_TOKEN" ]; then
+            echo "No AUTO_MERGE_TOKEN provided (likely a fork). Skipping auto-merge."
+            exit 0
+          fi
+          
+          # If we have the token, execute the auto-merge command
+          gh pr merge --auto --squash "${{ steps.cpr.outputs.pull-request-number }}"
