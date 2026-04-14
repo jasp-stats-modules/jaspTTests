@@ -37,7 +37,7 @@ jobs:
       - name: Create Pull Request
         id: cpr
         # PINNED TO SHA: This guarantees the code can never be maliciously altered
-        uses: peter-evans/create-pull-request@153407881ce5f542f288766ce3a5bf60cb15a930 # v6.0.5
+        uses: peter-evans/create-pull-request@v6
         with:
           token: ${{ secrets.AUTO_MERGE_TOKEN || github.token }}
           commit-message: "chore: update renv.lock dependencies via jaspModuleTools"
