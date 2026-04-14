@@ -14,7 +14,6 @@ jobs:
       - name: Checkout repository
         uses: actions/checkout@v4
         with:
-          # Uses your Org secret if available, otherwise default token
           token: ${{ secrets.AUTO_MERGE_TOKEN || github.token }}
 
       - name: Setup R
@@ -24,23 +23,19 @@ jobs:
           use-public-rspm: true 
 
       - name: Install jaspModuleTools and run updateLockfile
+        env:
+          GITHUB_PAT: ${{ github.token }}
         run: |
-          # 1. Install remotes (needed to grab packages from GitHub)
           Rscript -e 'install.packages("remotes")'
-          
-          # 2. Install your JASP tools directly from the master branch
           Rscript -e 'remotes::install_github("jasp-stats/jaspModuleTools")'
-          
-          # 3. Call your custom update function on the current directory
           Rscript -e 'jaspModuleTools::updateLockfile("./")'
 
       - name: Create Pull Request
         id: cpr
-        # PINNED TO SHA: This guarantees the code can never be maliciously altered
         uses: peter-evans/create-pull-request@v6
         with:
           token: ${{ secrets.AUTO_MERGE_TOKEN || github.token }}
-          commit-message: "chore: update renv.lock dependencies via jaspModuleTools"
+          commit-message: "chore: update renv.lock"
           branch: "chore/update-renv"
           delete-branch: true
           title: "chore: update renv.lock dependencies"
@@ -54,7 +49,6 @@ jobs:
         env:
           GH_TOKEN: ${{ secrets.AUTO_MERGE_TOKEN }}
         run: |
-          # Check if the token is empty in bash (bypassing the YAML secrets restriction)
           if [ -z "$GH_TOKEN" ]; then
             echo "No AUTO_MERGE_TOKEN provided (likely a fork). Skipping auto-merge."
             exit 0
